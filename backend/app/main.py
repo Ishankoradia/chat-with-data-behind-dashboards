@@ -23,29 +23,38 @@ from app.api.v1.routers import datasources, dashboard_contexts, chat_sessions
 def setup_agent_logging():
     """Setup detailed logging for LangGraph agent states"""
     
+    # Determine log level based on development/production mode
+    log_level = getattr(logging, settings.LOG_LEVEL.upper(), logging.INFO)
+    if settings.DEVELOPMENT:
+        log_level = logging.DEBUG
+    
     # Create formatters
     detailed_formatter = logging.Formatter(
-        '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-        datefmt='%Y-%m-%d %H:%M:%S'
+        settings.LOG_FORMAT,
+        datefmt=settings.LOG_DATE_FORMAT
     )
     
     # Configure root logger
     root_logger = logging.getLogger()
-    root_logger.setLevel(logging.INFO)
+    root_logger.setLevel(log_level)
     
-    # Configure agent-specific loggers with higher verbosity
+    # Configure agent-specific loggers
     agent_logger = logging.getLogger('agents.nodes')
-    agent_logger.setLevel(logging.INFO)
+    agent_logger.setLevel(logging.DEBUG if settings.DEVELOPMENT else logging.INFO)
+    
+    # Configure orchestrator logger
+    orchestrator_logger = logging.getLogger('app.agents.orchestrator')
+    orchestrator_logger.setLevel(logging.DEBUG if settings.DEVELOPMENT else logging.INFO)
     
     # Create console handler for agents if it doesn't exist
     if not agent_logger.handlers:
         console_handler = logging.StreamHandler(sys.stdout)
         console_handler.setFormatter(detailed_formatter)
-        console_handler.setLevel(logging.INFO)
+        console_handler.setLevel(log_level)
         agent_logger.addHandler(console_handler)
         agent_logger.propagate = False  # Prevent duplicate logs
     
-    logging.info("🔧 Agent state logging configured - you'll see detailed state transitions")
+    logging.info(f"🔧 Agent logging configured - Level: {logging.getLevelName(log_level)} | Development: {settings.DEVELOPMENT}")
 
 # Setup logging on startup
 setup_agent_logging()

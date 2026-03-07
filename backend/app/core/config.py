@@ -39,6 +39,14 @@ class Settings(BaseSettings):
     # Dashboard Context
     DASHBOARD_CONTEXT_LIMIT: int = 10  # Number of dashboard elements to include
     
+    # Logging Configuration
+    LOG_LEVEL: str = "INFO"  # DEBUG, INFO, WARNING, ERROR, CRITICAL
+    LOG_FORMAT: str = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    LOG_DATE_FORMAT: str = "%Y-%m-%d %H:%M:%S"
+    
+    # Development vs Production flags
+    DEVELOPMENT: bool = False  # Set to True for development logging
+    
     class Config:
         env_file = ".env"
 

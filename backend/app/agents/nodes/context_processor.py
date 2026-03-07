@@ -1,9 +1,14 @@
 """
 Dashboard context processing node
 """
+import logging
 from typing import Dict, Any
 from app.agents.types import AgentState
 from app.core.config import settings
+from app.agents.utils import create_node_logger
+
+# Configure logger for this node
+logger = create_node_logger("context_processor")
 
 
 def process_dashboard_context(state: AgentState) -> Dict[str, Any]:
@@ -13,7 +18,7 @@ def process_dashboard_context(state: AgentState) -> Dict[str, Any]:
     In the new session-based system, the dashboard context is already
     loaded and passed in the state by the orchestrator.
     """
-    print("DEBUG: Context processor executing")
+    logger.debug("Context processor executing")
     try:
         # Dashboard context is already provided by the orchestrator
         dashboard_context = state.get("dashboard_context")
@@ -22,8 +27,8 @@ def process_dashboard_context(state: AgentState) -> Dict[str, Any]:
         dbt_metrics = None
         dbt_dimensions = None
         
-        print("DEBUG: Context processor completed successfully")
-        print(f"DEBUG: Context processor returning state keys: {list({'dashboard_context': dashboard_context, 'dbt_metrics': dbt_metrics, 'dbt_dimensions': dbt_dimensions}.keys())}")
+        logger.debug("Context processor completed successfully")
+        logger.debug(f"Context processor returning state keys: {list({'dashboard_context': dashboard_context, 'dbt_metrics': dbt_metrics, 'dbt_dimensions': dbt_dimensions}.keys())}")
         return {
             "dashboard_context": dashboard_context,
             "dbt_metrics": dbt_metrics,

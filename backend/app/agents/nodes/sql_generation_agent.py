@@ -55,7 +55,7 @@ def generate_sql_query(state: AgentState) -> Dict[str, Any]:
         'error': state.get('error')
     }, indent=2)}")
     
-    print("DEBUG: SQL generator executing")
+    logger.debug("SQL generator executing")
     user_query = state["user_query"]
     enhanced_analysis = state.get("enhanced_analysis")
     dashboard_context = state.get("dashboard_context")
@@ -91,12 +91,12 @@ def generate_sql_query(state: AgentState) -> Dict[str, Any]:
         dashboard_context = state.get("dashboard_context")
         datasets = dashboard_context.get("datasets", []) if dashboard_context else []
         
-        print(f"DEBUG: Using {len(datasets)} tables from dashboard context")
-        print(f"DEBUG: Dashboard context keys: {list(dashboard_context.keys()) if dashboard_context else 'None'}")
+        logger.debug(f"Using {len(datasets)} tables from dashboard context")
+        logger.debug(f"Dashboard context keys: {list(dashboard_context.keys()) if dashboard_context else 'None'}")
         if datasets:
-            print(f"DEBUG: First dataset: {datasets[0]}")
-            print(f"DEBUG: First dataset type: {type(datasets[0])}")
-            print(f"DEBUG: First dataset attributes: {dir(datasets[0]) if hasattr(datasets[0], '__dict__') else 'No attributes'}")
+            logger.debug(f"First dataset: {datasets[0]}")
+            logger.debug(f"First dataset type: {type(datasets[0])}")
+            logger.debug(f"First dataset attributes: {dir(datasets[0]) if hasattr(datasets[0], '__dict__') else 'No attributes'}")
         
         # Get actual table schemas from database
         schema_info = []
@@ -109,14 +109,14 @@ def generate_sql_query(state: AgentState) -> Dict[str, Any]:
                 # instead of creating new database connections here since we're in sync context
                 datasource = dashboard_context.get("datasource") if dashboard_context else None
                 # Process datasets regardless of datasource availability
-                print(f"DEBUG: Processing {len(datasets)} tables from dashboard context")
+                logger.debug(f"Processing {len(datasets)} tables from dashboard context")
                 
                 for dataset in datasets:
                     dataset_table_name = getattr(dataset, 'table_name', str(dataset))
                     dataset_schema_name = getattr(dataset, 'table_schema', 'public')
                     full_name = f"{dataset_schema_name}.{dataset_table_name}"
                     
-                    print(f"DEBUG: Adding table from dashboard context: {full_name}")
+                    logger.debug(f"Adding table from dashboard context: {full_name}")
                     
                     # Get column information if datasource is available
                     columns = []
@@ -168,10 +168,10 @@ def generate_sql_query(state: AgentState) -> Dict[str, Any]:
                             
                             # Run the async function
                             columns, row_count = asyncio.run(get_table_schema())
-                            print(f"DEBUG: Retrieved {len(columns)} columns for {full_name}")
+                            logger.debug(f"Retrieved {len(columns)} columns for {full_name}")
                             
                         except Exception as schema_error:
-                            print(f"DEBUG: Failed to get schema for {full_name}: {schema_error}")
+                            logger.debug(f"Failed to get schema for {full_name}: {schema_error}")
                             columns = []
                             row_count = None
                     
@@ -185,12 +185,12 @@ def generate_sql_query(state: AgentState) -> Dict[str, Any]:
                     })
                     
                 if datasource:
-                    print(f"DEBUG: Using datasource: {datasource.name}")
+                    logger.debug(f"Using datasource: {datasource.name}")
                 else:
-                    print("DEBUG: No datasource found in dashboard context - using basic table info")
+                    logger.debug("No datasource found in dashboard context - using basic table info")
                         
             except Exception as e:
-                print(f"DEBUG: Error getting table schemas: {e}")
+                logger.debug(f"Error getting table schemas: {e}")
                 # Fallback to basic info if schema discovery fails
                 for dataset in datasets:
                     table_name = getattr(dataset, 'table_name', str(dataset))
@@ -206,7 +206,7 @@ def generate_sql_query(state: AgentState) -> Dict[str, Any]:
                         "description": f"Table {full_name} (schema discovery failed)"
                     })
         else:
-            print("DEBUG: No user_id or datasource_id available for schema discovery")
+            logger.debug("No user_id or datasource_id available for schema discovery")
         
         # Schema info is already built above from dashboard context
         
@@ -312,7 +312,7 @@ def generate_sql_query(state: AgentState) -> Dict[str, Any]:
         # Update thinking process
         thinking_process.execution_summary += f" → Generated SQL query ({sql_result.confidence:.2f} confidence)"
         
-        print("DEBUG: SQL generator completed successfully")
+        logger.debug("SQL generator completed successfully")
         
         result = {
             "generated_sql": sql_result.sql_query,

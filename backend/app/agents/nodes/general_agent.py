@@ -1,19 +1,24 @@
 """
 General Agent - handles general dashboard questions and explanations
 """
+import logging
 from typing import Dict, Any
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import SystemMessage, HumanMessage
 
 from app.agents.types import AgentState
 from app.core.config import settings
+from app.agents.utils import create_node_logger
+
+# Configure logger for this node
+logger = create_node_logger("general_agent")
 
 
 def handle_general_query(state: AgentState) -> Dict[str, Any]:
     """
     Handle general questions about dashboards and explanatory queries
     """
-    print("DEBUG: General agent executing")
+    logger.debug("General agent executing")
     user_query = state["user_query"]
     dashboard_context = state.get("dashboard_context")
     

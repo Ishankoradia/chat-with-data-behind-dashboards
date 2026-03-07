@@ -1,6 +1,7 @@
 """
 Enhanced agent orchestration graph with transparent reasoning and SQL execution
 """
+import logging
 
 from langgraph.graph import StateGraph, START, END
 
@@ -13,13 +14,17 @@ from .nodes.sql_execution_agent import execute_sql_with_reasoning
 from .nodes.insights_generation_agent import generate_data_insights, format_enhanced_response
 from .nodes.general_agent import handle_general_query
 
+# Configure logger for this module
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+
 
 def route_after_planning(state: AgentState) -> str:
     """Route based on execution plan from data planner"""
     execution_plan = state.get("execution_plan")
-    print(f"DEBUG: Routing after planning, execution_plan={execution_plan}")
+    logger.debug(f"Routing after planning, execution_plan={execution_plan}")
     if not execution_plan:
-        print("DEBUG: No execution plan, routing to general_agent")
+        logger.debug("No execution plan, routing to general_agent")
         return "general_agent"
 
     from app.models.enhanced_query import ExecutionPlan
@@ -28,10 +33,10 @@ def route_after_planning(state: AgentState) -> str:
         execution_plan == ExecutionPlan.SIMPLE_SQL.value
         or execution_plan == ExecutionPlan.COMPLEX_SQL.value
     ):
-        print("DEBUG: SQL execution plan, routing to sql_generator")
+        logger.debug("SQL execution plan, routing to sql_generator")
         return "sql_generator"
     else:
-        print(f"DEBUG: Non-SQL execution plan ({execution_plan}), routing to general_agent")
+        logger.debug(f"Non-SQL execution plan ({execution_plan}), routing to general_agent")
         return "general_agent"
 
 

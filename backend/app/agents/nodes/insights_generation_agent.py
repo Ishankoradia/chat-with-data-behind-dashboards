@@ -35,7 +35,7 @@ def generate_data_insights(state: AgentState) -> Dict[str, Any]:
     # Log incoming state
     log_agent_state(logger, "INSIGHTS_GENERATION_AGENT", state, "input")
     
-    print("DEBUG: Insights generation starting")
+    logger.debug("Insights generation starting")
     sql_query_result = state.get("sql_query_result")
     user_query = state["user_query"]
     enhanced_analysis = state.get("enhanced_analysis")
@@ -48,7 +48,7 @@ def generate_data_insights(state: AgentState) -> Dict[str, Any]:
         print(f"DEBUG: sql_query_result.row_count: {sql_query_result.row_count}")
     
     if not thinking_process:
-        print("DEBUG: Missing thinking process")
+        logger.debug("Missing thinking process")
         return {"error": "Missing thinking process"}
     
     if not sql_query_result or not sql_query_result.execution_success:
@@ -251,7 +251,7 @@ def format_enhanced_response(state: AgentState) -> Dict[str, Any]:
     # Log incoming state
     log_agent_state(logger, "RESPONSE_FORMATTER", state, "input")
     
-    print("DEBUG: Format enhanced response starting")
+    logger.debug("Format enhanced response starting")
     generated_insights = state.get("generated_insights")
     sql_query_result = state.get("sql_query_result")
     thinking_process = state.get("thinking_process")

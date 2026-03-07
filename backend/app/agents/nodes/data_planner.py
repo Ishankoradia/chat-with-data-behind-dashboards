@@ -18,7 +18,7 @@ def plan_data_retrieval(state: AgentState) -> Dict[str, Any]:
     # Log incoming state
     log_agent_state(logger, "DATA_PLANNER", state, "input")
     
-    print("DEBUG: Data planner executing")
+    logger.debug("Data planner executing")
     enhanced_analysis = state.get("enhanced_analysis")
     thinking_process = state.get("thinking_process")
     
@@ -91,7 +91,7 @@ def plan_data_retrieval(state: AgentState) -> Dict[str, Any]:
         # Update thinking process
         thinking_process.execution_summary += f" → {routing_decision}"
         
-        print("DEBUG: Data planner completed successfully")
+        logger.debug("Data planner completed successfully")
         
         result = {
             "execution_plan": execution_plan,

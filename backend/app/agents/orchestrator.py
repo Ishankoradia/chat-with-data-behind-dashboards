@@ -3,6 +3,7 @@ Main orchestrator that ties everything together
 """
 import uuid
 import asyncio
+import logging
 from typing import Optional, AsyncGenerator, Dict, Any
 from langchain_core.runnables import RunnableConfig
 from langchain_core.messages import HumanMessage, AIMessage
@@ -12,6 +13,10 @@ from app.agents.graph import dashboard_chat_graph
 from app.agents.types import AgentState
 from app.services.postgres_database_service import get_postgres_db_service
 from app.models.datasource import ChatMessage
+
+# Configure logger
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
 
 
 class DashboardChatOrchestrator:
@@ -165,63 +170,63 @@ class DashboardChatOrchestrator:
         """
         Stream response for a session message as Server-Sent Events
         """
-        print(f"DEBUG: Stream function called with message: {message}")
+        logger.debug(f"Stream function called with message: {message}")
         db_service = self.db_service
         if not db_service:
             raise ValueError("Database service not provided to orchestrator")
-        print("DEBUG: Got PostgreSQL db_service")
+        logger.debug("Got PostgreSQL db_service")
         
         # Get session and dashboard context with PostgreSQL
-        print(f"DEBUG: Getting chat session with ID={chat_session_id}, user_id={user_id}...")
+        logger.debug(f"Getting chat session with ID={chat_session_id}, user_id={user_id}")
         try:
             session = await asyncio.wait_for(
                 db_service.get_chat_session(chat_session_id, user_id),
                 timeout=5.0
             )
         except asyncio.TimeoutError:
-            print("ERROR: Chat session lookup timed out")
+            logger.error("Chat session lookup timed out")
             yield f"data: {{\"error\": \"Chat session lookup timed out\", \"final\": true}}\n\n"
             return
         except Exception as e:
-            print(f"ERROR: Chat session lookup failed: {e}")
+            logger.error(f"Chat session lookup failed: {e}")
             yield f"data: {{\"error\": \"Chat session lookup failed: {str(e)}\", \"final\": true}}\n\n"
             return
         if not session:
-            print("DEBUG: Chat session not found")
+            logger.debug("Chat session not found")
             yield f"data: {{\"error\": \"Chat session not found\", \"final\": true}}\n\n"
             return
-        print(f"DEBUG: Got session: {session.id}")
+        logger.debug(f"Got session: {session.id}")
         
-        print("DEBUG: Getting dashboard context...")
+        logger.debug("Getting dashboard context...")
         try:
             dashboard_context = await asyncio.wait_for(
                 db_service.get_dashboard_context(session.dashboard_context_id, user_id),
                 timeout=5.0
             )
         except asyncio.TimeoutError:
-            print("ERROR: Dashboard context lookup timed out")
+            logger.error("Dashboard context lookup timed out")
             yield f"data: {{\"error\": \"Dashboard context lookup timed out\", \"final\": true}}\n\n"
             return
         except Exception as e:
-            print(f"ERROR: Dashboard context lookup failed: {e}")
+            logger.error(f"Dashboard context lookup failed: {e}")
             yield f"data: {{\"error\": \"Dashboard context lookup failed: {str(e)}\", \"final\": true}}\n\n"
             return
         if not dashboard_context:
-            print("DEBUG: Dashboard context not found")
+            logger.debug("Dashboard context not found")
             yield f"data: {{\"error\": \"Dashboard context not found\", \"final\": true}}\n\n"
             return
-        print(f"DEBUG: Got dashboard context: {dashboard_context.id}")
+        logger.debug(f"Got dashboard context: {dashboard_context.id}")
         
         try:
-            print("DEBUG: Getting datasource and datasets...")
+            logger.debug("Getting datasource and datasets...")
             from app.services.datasource_service import DatasourceService
             datasource_service = DatasourceService(db_session=db_service.session)
             datasource = await datasource_service.get_datasource(dashboard_context.datasource_id, user_id)
-            print(f"DEBUG: Got datasource: {datasource.name if datasource else 'None'}")
+            logger.debug(f"Got datasource: {datasource.name if datasource else 'None'}")
             datasets = await db_service.get_datasets_for_context(dashboard_context.id)
-            print(f"DEBUG: Got {len(datasets)} datasets")
+            logger.debug(f"Got {len(datasets)} datasets")
         except Exception as e:
-            print(f"ERROR: Datasource/datasets lookup failed: {e}")
+            logger.error(f"Datasource/datasets lookup failed: {e}")
             yield f"data: {{\"error\": \"Datasource lookup failed: {str(e)}\", \"final\": true}}\n\n"
             return
             
@@ -262,26 +267,27 @@ class DashboardChatOrchestrator:
         
         # Execute enhanced graph with debugging
         try:
-            print("DEBUG: About to yield first message")
+            logger.debug("About to yield first message")
             yield f"data: {{\"status\": \"processing\", \"step\": \"🧠 Starting enhanced analysis\"}}\n\n"
-            print("DEBUG: First message yielded")
+            logger.debug("First message yielded")
             
             try:
-                print(f"DEBUG: About to execute graph with state keys: {list(state.keys())}")
-                print(f"DEBUG: Graph type: {type(self.graph)}")
+                logger.debug(f"About to execute graph with state keys: {list(state.keys())}")
+                logger.debug(f"Graph type: {type(self.graph)}")
                 # Add 120 second timeout to give graph more time
                 final_state = await asyncio.wait_for(
                     self.graph.ainvoke(state, config=config),
                     timeout=120.0
                 )
-                print("DEBUG: Graph execution completed successfully")
-                print(f"DEBUG: Final state keys: {list(final_state.keys()) if final_state else 'None'}")
-                print(f"DEBUG: Final response: {final_state.get('final_response', 'NONE')}")
-                print(f"DEBUG: Query result exists: {final_state.get('query_result') is not None}")
-                print(f"DEBUG: SQL query result exists: {final_state.get('sql_query_result') is not None}")
-                print(f"DEBUG: Generated insights exists: {final_state.get('generated_insights') is not None}")
+                logger.debug("Graph execution completed successfully")
+                logger.debug(f"Final state keys: {list(final_state.keys()) if final_state else 'None'}")
+                logger.debug(f"Final response: {final_state.get('final_response', 'NONE')}")
+                logger.debug(f"Query result exists: {final_state.get('query_result') is not None}")
+                logger.debug(f"SQL query result exists: {final_state.get('sql_query_result') is not None}")
+                logger.debug(f"Generated insights exists: {final_state.get('generated_insights') is not None}")
                 yield f"data: {{\"status\": \"processing\", \"step\": \"✅ Enhanced analysis complete\"}}\n\n"
             except asyncio.TimeoutError:
+                logger.error("Graph execution timed out after 120 seconds")
                 yield f"data: {{\"status\": \"error\", \"step\": \"❌ Graph execution timed out after 120 seconds\"}}\n\n"
                 # Fallback response  
                 final_state = {
@@ -290,6 +296,7 @@ class DashboardChatOrchestrator:
                     "thinking_process": None
                 }
             except Exception as graph_error:
+                logger.error(f"Graph execution failed: {graph_error}")
                 yield f"data: {{\"status\": \"error\", \"step\": \"❌ Graph execution failed: {str(graph_error)}\"}}\n\n"
                 # Fallback response
                 final_state = {

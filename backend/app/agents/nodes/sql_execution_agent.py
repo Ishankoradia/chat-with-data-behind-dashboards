@@ -49,17 +49,17 @@ def execute_sql_with_reasoning(state: AgentState) -> Dict[str, Any]:
     # Log incoming state
     log_agent_state(logger, "SQL_EXECUTION_AGENT", state, "input")
     
-    print("DEBUG: SQL execution node executing")
+    logger.debug("SQL execution node executing")
     generated_sql = state.get("generated_sql")
     user_query = state["user_query"]
     thinking_process = state.get("thinking_process")
     
     if not thinking_process:
-        print("DEBUG: Missing thinking process")
+        logger.debug("Missing thinking process")
         return {"error": "Missing thinking process"}
     
     if not generated_sql:
-        print("DEBUG: No SQL query to execute")
+        logger.debug("No SQL query to execute")
         return {"error": "No SQL query to execute"}
     
     print(f"DEBUG: Executing SQL: {generated_sql}")
@@ -151,7 +151,7 @@ def execute_sql_with_reasoning(state: AgentState) -> Dict[str, Any]:
         "query_successful": sql_result.execution_success
     }
     
-    print("DEBUG: Real SQL execution completed successfully")
+    logger.debug("Real SQL execution completed successfully")
     
     result = {
         "sql_query_result": sql_result,

@@ -45,7 +45,7 @@ def enhanced_query_analyzer(state: AgentState) -> Dict[str, Any]:
     # Log incoming state
     log_agent_state(logger, "ENHANCED_QUERY_ANALYZER", state, "input")
     
-    print("DEBUG: Enhanced query analyzer executing")
+    logger.debug("Enhanced query analyzer executing")
     user_query = state["user_query"]
     dashboard_context = state.get("dashboard_context")
     
@@ -196,7 +196,7 @@ def enhanced_query_analyzer(state: AgentState) -> Dict[str, Any]:
         thinking_process.decision_rationale = analysis_result.reasoning
         thinking_process.execution_summary = f"Query classified as {analysis_result.query_type.value} with {analysis_result.execution_plan.value} execution plan (confidence: {analysis_result.confidence_score:.2f})"
         
-        print("DEBUG: Enhanced query analyzer completed successfully")
+        logger.debug("Enhanced query analyzer completed successfully")
         
         result = {
             "enhanced_analysis": enhanced_analysis,

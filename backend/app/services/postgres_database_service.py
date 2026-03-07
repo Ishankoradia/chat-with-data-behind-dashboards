@@ -107,9 +107,16 @@ class PostgresDatabaseService:
                 table_schema TEXT NOT NULL,
                 alias TEXT,
                 is_enabled BOOLEAN DEFAULT true,
+                column_metadata TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (dashboard_context_id) REFERENCES chat_dashboard_contexts (id)
             )
+        ''')
+        
+        # Add column_metadata column if it doesn't exist (for existing databases)
+        await self.execute_sql('''
+            ALTER TABLE chat_datasets 
+            ADD COLUMN IF NOT EXISTS column_metadata TEXT
         ''')
         
         await self.session.commit()
@@ -429,46 +436,82 @@ class PostgresDatabaseService:
         """Save datasets for dashboard context"""
         print(f"DEBUG: Saving {len(datasets)} datasets for context {context_id}")
         for i, dataset in enumerate(datasets):
-            print(f"DEBUG: Dataset {i}: {dataset.table_schema}.{dataset.table_name}")
+            print(f"DEBUG: Dataset {i}: {dataset.table_schema}.{dataset.table_name} with {len(dataset.columns)} columns")
         
-        async with self.session.begin():
-            # Delete existing datasets for context
-            await self.session.execute(text('''
-                DELETE FROM chat_datasets WHERE dashboard_context_id = :context_id
-            '''), {'context_id': context_id})
+        # Delete existing datasets for context
+        await self.session.execute(text('''
+            DELETE FROM chat_datasets WHERE dashboard_context_id = :context_id
+        '''), {'context_id': context_id})
+        
+        # Insert new datasets
+        for dataset in datasets:
+            # Serialize column metadata to JSON
+            column_metadata_json = None
+            if dataset.columns:
+                column_metadata_json = json.dumps([
+                    {
+                        "name": col.name,
+                        "data_type": col.data_type,
+                        "is_nullable": col.is_nullable,
+                        "description": col.description
+                    }
+                    for col in dataset.columns
+                ])
             
-            # Insert new datasets
-            for dataset in datasets:
-                await self.session.execute(text('''
-                    INSERT INTO chat_datasets 
-                    (dashboard_context_id, table_name, table_schema, alias, is_enabled)
-                    VALUES (:context_id, :table_name, :table_schema, :alias, :is_enabled)
-                '''), {
-                    'context_id': context_id,
-                    'table_name': dataset.table_name,
-                    'table_schema': dataset.table_schema,
-                    'alias': dataset.alias,
-                    'is_enabled': dataset.is_enabled
-                })
+            await self.session.execute(text('''
+                INSERT INTO chat_datasets 
+                (dashboard_context_id, table_name, table_schema, alias, is_enabled, column_metadata)
+                VALUES (:context_id, :table_name, :table_schema, :alias, :is_enabled, :column_metadata)
+            '''), {
+                'context_id': context_id,
+                'table_name': dataset.table_name,
+                'table_schema': dataset.table_schema,
+                'alias': dataset.alias,
+                'is_enabled': dataset.is_enabled,
+                'column_metadata': column_metadata_json
+            })
+        
+        await self.session.commit()
     
     async def get_datasets_for_context(self, context_id: str) -> List[Dataset]:
         """Get datasets for dashboard context"""
         print(f"DEBUG: Getting datasets for context {context_id}")
         rows = await self.fetch_all('''
-            SELECT dashboard_context_id, table_name, table_schema, alias, is_enabled
+            SELECT dashboard_context_id, table_name, table_schema, alias, is_enabled, column_metadata
             FROM chat_datasets 
             WHERE dashboard_context_id = :context_id AND is_enabled = true
             ORDER BY table_name
         ''', {'context_id': context_id})
         
+        from app.models.datasource import TableColumn
+        
         datasets = []
         for row in rows:
+            # Deserialize column metadata from JSON
+            columns = []
+            if row[5]:  # column_metadata
+                try:
+                    column_data = json.loads(row[5])
+                    columns = [
+                        TableColumn(
+                            name=col["name"],
+                            data_type=col["data_type"],
+                            is_nullable=col["is_nullable"],
+                            description=col.get("description")
+                        )
+                        for col in column_data
+                    ]
+                except (json.JSONDecodeError, KeyError) as e:
+                    print(f"Warning: Failed to parse column metadata for {row[2]}.{row[1]}: {e}")
+                    columns = []
+            
             datasets.append(Dataset(
                 dashboard_context_id=context_id,
                 table_name=row[1],
                 table_schema=row[2],
                 alias=row[3],
-                is_enabled=row[4]
+                is_enabled=row[4],
+                columns=columns
             ))
         
         print(f"DEBUG: Found {len(datasets)} datasets for context {context_id}")

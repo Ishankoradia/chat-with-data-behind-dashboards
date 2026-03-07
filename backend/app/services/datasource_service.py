@@ -23,13 +23,19 @@ class DatasourceService:
         self.db_session = db_session
     
     async def test_connection(self, connection: DatasourceConnection) -> Dict[str, Any]:
-        """Test database connection"""
+        """Test database connection with timeout"""
         try:
-            conn = await asyncpg.connect(connection.get_connection_string())
+            # Quick connection test with timeout
+            conn = await asyncio.wait_for(
+                asyncpg.connect(connection.get_connection_string()),
+                timeout=5  # 5 second timeout
+            )
             
-            # Get basic database info
-            version = await conn.fetchval("SELECT version()")
-            current_db = await conn.fetchval("SELECT current_database()")
+            # Simple test query
+            current_db = await asyncio.wait_for(
+                conn.fetchval("SELECT current_database()"),
+                timeout=5
+            )
             
             await conn.close()
             
@@ -37,11 +43,16 @@ class DatasourceService:
                 "success": True,
                 "message": "Connection successful",
                 "database_info": {
-                    "version": version,
                     "current_database": current_db,
                 }
             }
             
+        except asyncio.TimeoutError:
+            return {
+                "success": False,
+                "message": "Connection timeout. Check your network and database details.",
+                "error": "Connection timeout"
+            }
         except Exception as e:
             return {
                 "success": False,
@@ -72,52 +83,44 @@ class DatasourceService:
         return await db_service.list_datasources(user_id)
     
     async def discover_tables(self, datasource_id: str, user_id: str) -> List[TableInfo]:
-        """Discover all tables in the datasource"""
+        """Discover tables and schemas - simple and fast"""
         datasource = await self.get_datasource(datasource_id, user_id)
         if not datasource:
             raise ValueError("Datasource not found")
         
         try:
-            conn = await asyncpg.connect(datasource.get_connection_string())
+            # Simple connection with timeout
+            conn = await asyncio.wait_for(
+                asyncpg.connect(datasource.get_connection_string()),
+                timeout=5  # 5 second connection timeout
+            )
             
-            # Get all tables with basic info
-            tables_query = """
-                SELECT 
-                    schemaname as schema_name,
-                    tablename as table_name,
-                    obj_description(c.oid) as description
-                FROM pg_tables pt
-                LEFT JOIN pg_class c ON c.relname = pt.tablename
+            # Simple query - just get schema and table names
+            query = """
+                SELECT schemaname, tablename 
+                FROM pg_tables 
                 WHERE schemaname NOT IN ('information_schema', 'pg_catalog', 'pg_toast')
                 ORDER BY schemaname, tablename
             """
             
-            table_rows = await conn.fetch(tables_query)
+            rows = await asyncio.wait_for(conn.fetch(query), timeout=10)
             tables = []
             
-            for row in table_rows:
-                # Get column information for each table
-                columns = await self._get_table_columns(
-                    conn, row['schema_name'], row['table_name']
-                )
-                
-                # Get row count estimate
-                row_count = await self._get_table_row_count(
-                    conn, row['schema_name'], row['table_name']
-                )
-                
+            for row in rows:
                 table_info = TableInfo(
-                    name=row['table_name'],
-                    schema=row['schema_name'],
-                    description=row['description'],
-                    row_count=row_count,
-                    columns=columns
+                    name=row['tablename'],
+                    schema=row['schemaname'],
+                    description=None,
+                    row_count=None,
+                    columns=[]  # Empty - we don't need column details for selection
                 )
                 tables.append(table_info)
             
             await conn.close()
             return tables
             
+        except asyncio.TimeoutError:
+            raise Exception("Connection timeout. Check your network and database details.")
         except Exception as e:
             raise Exception(f"Failed to discover tables: {str(e)}")
     
@@ -194,5 +197,22 @@ class DatasourceService:
             return result
         except Exception:
             return None
+    
+    async def get_table_columns(self, datasource_id: str, user_id: str, schema: str, table: str) -> List[TableColumn]:
+        """Get column information for a specific table"""
+        datasource = await self.get_datasource(datasource_id, user_id)
+        if not datasource:
+            raise Exception(f"Datasource {datasource_id} not found")
+        
+        conn = None
+        try:
+            conn = await asyncpg.connect(datasource.get_connection_string())
+            columns = await self._get_table_columns(conn, schema, table)
+            return columns
+        except Exception as e:
+            raise Exception(f"Failed to get columns for {schema}.{table}: {str(e)}")
+        finally:
+            if conn:
+                await conn.close()
     
     

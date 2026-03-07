@@ -1,9 +1,11 @@
 """
 Main orchestrator that ties everything together
 """
+import json
 import uuid
 import asyncio
 import logging
+from decimal import Decimal
 from typing import Optional, AsyncGenerator, Dict, Any
 from langchain_core.runnables import RunnableConfig
 from langchain_core.messages import HumanMessage, AIMessage
@@ -17,6 +19,23 @@ from app.models.datasource import ChatMessage
 # Configure logger
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
+
+
+def serialize_query_result(query_result):
+    """Serialize query result to JSON, handling Decimal objects"""
+    if not query_result:
+        return None
+    
+    def decimal_serializer(obj):
+        if isinstance(obj, Decimal):
+            return float(obj)
+        raise TypeError
+    
+    try:
+        return json.dumps(query_result, default=decimal_serializer)
+    except Exception as e:
+        logger.error(f"Failed to serialize query result: {e}")
+        return None
 
 
 class DashboardChatOrchestrator:
@@ -54,6 +73,10 @@ class DashboardChatOrchestrator:
         datasource_service = DatasourceService(db_session=db_service.session)
         datasource = await datasource_service.get_datasource(dashboard_context.datasource_id, user_id)
         datasets = await db_service.get_datasets_for_context(dashboard_context.id)
+        # Debug column metadata loading
+        for i, dataset in enumerate(datasets):
+            column_count = len(dataset.columns) if hasattr(dataset, 'columns') and dataset.columns else 0
+            print(f"🔍 ORCHESTRATOR: Dataset {i}: {dataset.table_schema}.{dataset.table_name} has {column_count} columns loaded")
         
         # Save user message
         user_message_id = str(uuid.uuid4())
@@ -128,7 +151,7 @@ class DashboardChatOrchestrator:
                 role="assistant",
                 content=response_content,
                 sql_query=sql_query,
-                query_result=str(query_result) if query_result else None,
+                query_result=serialize_query_result(query_result),
                 reasoning=reasoning_content
             )
             await db_service.save_chat_message(assistant_message)
@@ -225,6 +248,10 @@ class DashboardChatOrchestrator:
             logger.debug(f"Got datasource: {datasource.name if datasource else 'None'}")
             datasets = await db_service.get_datasets_for_context(dashboard_context.id)
             logger.debug(f"Got {len(datasets)} datasets")
+            # Debug column metadata loading
+            for i, dataset in enumerate(datasets):
+                column_count = len(dataset.columns) if hasattr(dataset, 'columns') and dataset.columns else 0
+                print(f"🔍 ORCHESTRATOR: Dataset {i}: {dataset.table_schema}.{dataset.table_name} has {column_count} columns loaded")
         except Exception as e:
             logger.error(f"Datasource/datasets lookup failed: {e}")
             yield f"data: {{\"error\": \"Datasource lookup failed: {str(e)}\", \"final\": true}}\n\n"
@@ -340,7 +367,7 @@ class DashboardChatOrchestrator:
                 role="assistant",
                 content=response_content,
                 sql_query=sql_query,
-                query_result=str(query_result) if query_result else None,
+                query_result=serialize_query_result(query_result),
                 reasoning=reasoning_content
             )
             await db_service.save_chat_message(assistant_message)

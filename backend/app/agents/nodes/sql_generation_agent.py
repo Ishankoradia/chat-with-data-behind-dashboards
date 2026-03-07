@@ -61,6 +61,68 @@ def generate_sql_query(state: AgentState) -> Dict[str, Any]:
     dashboard_context = state.get("dashboard_context")
     thinking_process = state.get("thinking_process")
     
+    # DEBUG: Print complete dashboard context
+    print("=" * 80)
+    print("🔍 DASHBOARD CONTEXT DEBUG INFO:")
+    print("=" * 80)
+    
+    if dashboard_context:
+        print(f"✅ Dashboard context exists: {type(dashboard_context)}")
+        
+        # Print datasource info
+        datasource = dashboard_context.get("datasource")
+        if datasource:
+            print(f"📊 Datasource: {datasource.name} ({datasource.type}) - {datasource.host}:{datasource.port}/{datasource.database}")
+        else:
+            print("❌ No datasource found in context")
+        
+        # Print datasets (tables) info
+        datasets = dashboard_context.get("datasets", [])
+        print(f"📋 Number of datasets/tables: {len(datasets)}")
+        
+        for i, dataset in enumerate(datasets):
+            print(f"\n🗂️  TABLE {i+1}:")
+            if hasattr(dataset, 'table_name'):
+                print(f"   Name: {dataset.table_schema}.{dataset.table_name}")
+                print(f"   Schema: {dataset.table_schema}")
+                print(f"   Alias: {getattr(dataset, 'alias', 'None')}")
+                print(f"   Enabled: {getattr(dataset, 'is_enabled', 'Unknown')}")
+                # Check if it has column information
+                if hasattr(dataset, 'columns') and dataset.columns:
+                    print(f"   ✅ Columns: {len(dataset.columns)} available (STORED METADATA)")
+                    for col in dataset.columns[:5]:  # Show first 5 columns
+                        nullable_str = "NULL" if col.is_nullable else "NOT NULL"
+                        desc_str = f" - {col.description}" if col.description else ""
+                        print(f"      - {col.name} ({col.data_type}) {nullable_str}{desc_str}")
+                    if len(dataset.columns) > 5:
+                        print(f"      ... and {len(dataset.columns) - 5} more columns")
+                else:
+                    print("   ❌ NO COLUMN INFORMATION AVAILABLE")
+            else:
+                print(f"   Raw dataset object: {type(dataset)} = {dataset}")
+        
+        # Print business context
+        text_context = dashboard_context.get("text_context")
+        json_context = dashboard_context.get("json_context") 
+        additional_instructions = dashboard_context.get("additional_instructions")
+        
+        print(f"\n📝 Text context: {'✅ Present' if text_context else '❌ None'}")
+        if text_context:
+            print(f"   Content: {text_context[:100]}...")
+            
+        print(f"📋 JSON context: {'✅ Present' if json_context else '❌ None'}")
+        if json_context:
+            print(f"   Content: {json_context[:100]}...")
+            
+        print(f"🔧 Additional instructions: {'✅ Present' if additional_instructions else '❌ None'}")
+        if additional_instructions:
+            print(f"   Content: {additional_instructions[:100]}...")
+        
+    else:
+        print("❌ NO dashboard context found in state!")
+    
+    print("=" * 80)
+    
     if not thinking_process:
         return {"error": "Missing thinking process"}
     
@@ -118,62 +180,25 @@ def generate_sql_query(state: AgentState) -> Dict[str, Any]:
                     
                     logger.debug(f"Adding table from dashboard context: {full_name}")
                     
-                    # Get column information if datasource is available
+                    # Use stored column information from dataset
                     columns = []
                     row_count = None
                     description = f"Table {full_name} from dashboard context"
                     
-                    if datasource:
-                        try:
-                            # Use the datasource to get column information directly
-                            import asyncpg
-                            import asyncio
-                            
-                            async def get_table_schema():
-                                connection_string = f"postgresql://{datasource.username}:{datasource.password}@{datasource.host}:{datasource.port}/{datasource.database}"
-                                conn = None
-                                try:
-                                    conn = await asyncpg.connect(connection_string)
-                                    
-                                    # Get column information
-                                    columns_query = """
-                                        SELECT 
-                                            column_name,
-                                            data_type,
-                                            is_nullable = 'YES' as is_nullable
-                                        FROM information_schema.columns 
-                                        WHERE table_schema = $1 AND table_name = $2
-                                        ORDER BY ordinal_position
-                                    """
-                                    column_rows = await conn.fetch(columns_query, dataset_schema_name, dataset_table_name)
-                                    
-                                    columns = [
-                                        {
-                                            "name": row['column_name'],
-                                            "data_type": row['data_type'],
-                                            "nullable": row['is_nullable']
-                                        }
-                                        for row in column_rows
-                                    ]
-                                    
-                                    # Get row count estimate
-                                    count_query = f'SELECT COUNT(*) FROM "{dataset_schema_name}"."{dataset_table_name}"'
-                                    count_result = await conn.fetchval(count_query)
-                                    
-                                    return columns, count_result
-                                    
-                                finally:
-                                    if conn:
-                                        await conn.close()
-                            
-                            # Run the async function
-                            columns, row_count = asyncio.run(get_table_schema())
-                            logger.debug(f"Retrieved {len(columns)} columns for {full_name}")
-                            
-                        except Exception as schema_error:
-                            logger.debug(f"Failed to get schema for {full_name}: {schema_error}")
-                            columns = []
-                            row_count = None
+                    # Get column information from stored metadata
+                    if hasattr(dataset, 'columns') and dataset.columns:
+                        columns = [
+                            {
+                                "name": col.name,
+                                "data_type": col.data_type,
+                                "nullable": col.is_nullable,
+                                "description": col.description
+                            }
+                            for col in dataset.columns
+                        ]
+                        print(f"✅ Using stored column metadata: {len(columns)} columns for {full_name}")
+                    else:
+                        print(f"⚠️ No stored column metadata found for {full_name}")
                     
                     schema_info.append({
                         "table_name": dataset_table_name,
@@ -191,20 +216,7 @@ def generate_sql_query(state: AgentState) -> Dict[str, Any]:
                         
             except Exception as e:
                 logger.debug(f"Error getting table schemas: {e}")
-                # Fallback to basic info if schema discovery fails
-                for dataset in datasets:
-                    table_name = getattr(dataset, 'table_name', str(dataset))
-                    schema_name = getattr(dataset, 'table_schema', 'public')
-                    full_name = f"{schema_name}.{table_name}"
-                    
-                    schema_info.append({
-                        "table_name": table_name,
-                        "schema_name": schema_name,
-                        "full_name": full_name,
-                        "columns": [],
-                        "row_count": None,
-                        "description": f"Table {full_name} (schema discovery failed)"
-                    })
+                print(f"❌ Error processing datasets: {e}")
         else:
             logger.debug("No user_id or datasource_id available for schema discovery")
         

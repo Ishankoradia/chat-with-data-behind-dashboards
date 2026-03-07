@@ -5,6 +5,7 @@ import time
 import asyncpg
 import asyncio
 import logging
+from decimal import Decimal
 from typing import Dict, Any, List
 from app.agents.types import AgentState
 from app.agents.utils import log_agent_state, create_node_logger
@@ -13,6 +14,18 @@ from app.core.config import settings
 
 # Configure logger for this node
 logger = create_node_logger("sql_execution_agent")
+
+
+def convert_decimal_values(value):
+    """Convert Decimal objects to float for JSON serialization"""
+    if isinstance(value, Decimal):
+        return float(value)
+    elif isinstance(value, dict):
+        return {k: convert_decimal_values(v) for k, v in value.items()}
+    elif isinstance(value, list):
+        return [convert_decimal_values(item) for item in value]
+    else:
+        return value
 
 
 async def _execute_sql_query(datasource, sql_query: str) -> List[Dict[str, Any]]:
@@ -29,10 +42,12 @@ async def _execute_sql_query(datasource, sql_query: str) -> List[Dict[str, Any]]
         # Execute the query
         rows = await conn.fetch(sql_query)
         
-        # Convert rows to list of dictionaries
+        # Convert rows to list of dictionaries with Decimal conversion
         results = []
         for row in rows:
             row_dict = dict(row)
+            # Convert any Decimal objects to float
+            row_dict = convert_decimal_values(row_dict)
             results.append(row_dict)
         
         return results

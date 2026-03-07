@@ -72,9 +72,31 @@ async def create_dashboard_context(
     db_service = await get_postgres_db_service(db_session)
     saved_id = await db_service.save_dashboard_context(context, user_id)
     
-    # Save associated datasets
+    # Save associated datasets with column metadata
     if request.datasets:
-        await db_service.save_datasets_for_context(saved_id, request.datasets)
+        # Fetch column metadata for each dataset
+        from app.services.datasource_service import DatasourceService
+        datasource_service = DatasourceService(db_session=db_session)
+        
+        enriched_datasets = []
+        for dataset in request.datasets:
+            try:
+                # Fetch column information for this table
+                columns = await datasource_service.get_table_columns(
+                    request.datasource_id, user_id, dataset.table_schema, dataset.table_name
+                )
+                # Remove sample values to save storage space
+                for col in columns:
+                    col.sample_values = None
+                dataset.columns = columns
+                print(f"✅ Fetched {len(columns)} columns for {dataset.table_schema}.{dataset.table_name}")
+            except Exception as e:
+                print(f"⚠️ Failed to fetch columns for {dataset.table_schema}.{dataset.table_name}: {e}")
+                dataset.columns = []
+            
+            enriched_datasets.append(dataset)
+        
+        await db_service.save_datasets_for_context(saved_id, enriched_datasets)
     
     # Return the created context with datasets
     saved_context = await db_service.get_dashboard_context(saved_id, user_id)
@@ -183,7 +205,29 @@ async def update_dashboard_context(
     
     # Update datasets if provided
     if request.datasets is not None:
-        await db_service.save_datasets_for_context(context_id, request.datasets)
+        # Fetch column metadata for each dataset
+        from app.services.datasource_service import DatasourceService
+        datasource_service = DatasourceService(db_session=db_session)
+        
+        enriched_datasets = []
+        for dataset in request.datasets:
+            try:
+                # Fetch column information for this table
+                columns = await datasource_service.get_table_columns(
+                    existing_context.datasource_id, user_id, dataset.table_schema, dataset.table_name
+                )
+                # Remove sample values to save storage space
+                for col in columns:
+                    col.sample_values = None
+                dataset.columns = columns
+                print(f"✅ Updated: Fetched {len(columns)} columns for {dataset.table_schema}.{dataset.table_name}")
+            except Exception as e:
+                print(f"⚠️ Update: Failed to fetch columns for {dataset.table_schema}.{dataset.table_name}: {e}")
+                dataset.columns = []
+            
+            enriched_datasets.append(dataset)
+        
+        await db_service.save_datasets_for_context(context_id, enriched_datasets)
     
     # Return updated context
     saved_context = await db_service.get_dashboard_context(context_id, user_id)

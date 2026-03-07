@@ -63,6 +63,7 @@ class Dataset(BaseModel):
     alias: Optional[str] = None  # User-friendly name
     description: Optional[str] = None
     is_enabled: bool = True
+    columns: Optional[List[TableColumn]] = Field(default_factory=list, description="Table column metadata")
     
     @property
     def full_table_name(self) -> str:

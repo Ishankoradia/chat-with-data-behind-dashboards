@@ -321,11 +321,18 @@ def format_enhanced_response(state: AgentState) -> Dict[str, Any]:
                     response_parts.append(f"• {limitation}")
         
         else:
-            # Fallback response if no insights
-            response_parts.append(f"I executed your query successfully.")
-            if sql_query_result:
+            # Check if this was a general query response
+            if state.get("final_response"):
+                # Use the response from the general agent
+                response_parts.append(state.get("final_response"))
+            elif sql_query_result:
+                # SQL execution without insights generation
+                response_parts.append(f"I executed your query successfully.")
                 response_parts.append(f"Found {sql_query_result.row_count} results in {sql_query_result.execution_time_ms:.0f}ms.")
                 response_parts.append("Please check the results tab for detailed data.")
+            else:
+                # No insights and no SQL result - should not happen
+                response_parts.append("I processed your request but couldn't generate a detailed response.")
         
         final_response = "\n".join(response_parts)
         

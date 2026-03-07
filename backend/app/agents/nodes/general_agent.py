@@ -36,27 +36,60 @@ def handle_general_query(state: AgentState) -> Dict[str, Any]:
             datasource = dashboard_context.get("datasource")
             datasets = dashboard_context.get("datasets", [])
             text_context = dashboard_context.get("text_context")
+            json_context = dashboard_context.get("json_context")
+            additional_instructions = dashboard_context.get("additional_instructions")
             
-            context_info += f"Database: {datasource.name if datasource else 'Unknown'}\n"
-            context_info += f"Available tables: {', '.join([d.display_name for d in datasets])}\n"
+            # Database information
+            if datasource:
+                context_info += f"Database: {datasource.name} ({datasource.database})\n"
+                context_info += f"Database type: {datasource.type}\n"
+                context_info += f"Host: {datasource.host}:{datasource.port}\n\n"
             
+            # Tables information
+            if datasets:
+                context_info += f"Selected Tables ({len(datasets)} total):\n"
+                for dataset in datasets:
+                    # Handle both object and dict formats
+                    if hasattr(dataset, 'table_name'):
+                        table_name = f"{dataset.table_schema}.{dataset.table_name}"
+                        display_name = getattr(dataset, 'alias', None) or dataset.table_name
+                    else:
+                        table_name = f"{dataset.get('table_schema', 'unknown')}.{dataset.get('table_name', 'unknown')}"
+                        display_name = dataset.get('alias') or dataset.get('table_name', 'unknown')
+                    
+                    context_info += f"  - {display_name} ({table_name})\n"
+                context_info += "\n"
+            else:
+                context_info += "No tables selected yet.\n\n"
+            
+            # Business context
             if text_context:
-                context_info += f"Business Context: {text_context}\n"
+                context_info += f"Business Context:\n{text_context}\n\n"
+            
+            # Structured context
+            if json_context:
+                context_info += f"Structured Metadata:\n{json_context}\n\n"
+            
+            # Additional instructions
+            if additional_instructions:
+                context_info += f"Additional Instructions:\n{additional_instructions}\n\n"
         
         system_prompt = f"""
         You are a helpful data analyst assistant for dashboard conversations.
         
-        Answer the user's question about the dashboard in a clear, informative way.
-        Provide explanations about dashboard features, data insights, or guidance on how to explore the data.
+        When users ask about the dashboard, provide a comprehensive summary of what's available.
+        Answer their questions in a clear, informative way and help them understand their data setup.
         
-        Dashboard Context:
+        CURRENT DASHBOARD CONTEXT:
         {context_info}
         
         Guidelines:
+        - For dashboard overview questions, summarize the database connection, available tables, and context
+        - Explain what kind of analysis they can do with their current setup
+        - Suggest specific queries they might want to try based on their tables
         - Be conversational and helpful
         - Explain technical concepts in simple terms
-        - Suggest actionable next steps when appropriate
-        - If you don't have specific information, be honest about limitations
+        - If they ask about the dashboard generally, give them a complete picture of their current setup
         """
         
         messages = [
@@ -73,7 +106,7 @@ def handle_general_query(state: AgentState) -> Dict[str, Any]:
         }
         
     except Exception as e:
-        print(f"Error in general agent: {e}")
+        logger.error(f"Error in general agent: {e}")
         return {
             "final_response": f"I encountered an error while processing your question: {str(e)}",
             "query_result": None,

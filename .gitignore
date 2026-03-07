@@ -1,0 +1,246 @@
+# ===== ENVIRONMENT & SECRETS =====
+# Environment files (CRITICAL - contains API keys and database passwords)
+.env
+.env.*
+.env.local
+.env.production
+.env.staging
+*.env
+backend/.env
+backend/.env.*
+frontend/.env
+frontend/.env.*
+
+# ===== BACKEND (Python/FastAPI) =====
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+.venv/
+venv/
+backend/.venv/
+backend/venv/
+env/
+ENV/
+
+# UV (Python package manager)
+.uv/
+backend/.uv/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# IPython
+profile_default/
+ipython_config.py
+
+# PyCharm
+.idea/
+
+# ===== DATABASE FILES =====
+# SQLite databases (contains user data and connection details)
+*.db
+*.sqlite
+*.sqlite3
+backend/data/
+backend/data/*.db
+backend/data/*.sqlite
+backend/data/*.sqlite3
+
+# Database backups
+*.sql
+*.dump
+
+# ===== FRONTEND (Next.js/React) =====
+# Dependencies
+node_modules/
+frontend/node_modules/
+/.pnp
+.pnp.js
+.pnp.*
+
+# Production builds
+.next/
+out/
+build/
+dist/
+
+# Next.js specific
+.next/
+.vercel/
+.swc/
+
+# ===== LOGS =====
+# Log files
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+logs/
+backend/logs/
+frontend/logs/
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# ===== TESTING & COVERAGE =====
+# Coverage directory used by tools like istanbul
+coverage/
+*.lcov
+.nyc_output
+.coverage
+htmlcov/
+.pytest_cache/
+.cache
+
+# ===== IDE & EDITORS =====
+# VSCode
+.vscode/
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# IntelliJ IDEA
+.idea/
+*.iws
+*.iml
+*.ipr
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# Vim
+*~
+*.swp
+*.swo
+.vimrc
+
+# ===== OPERATING SYSTEM =====
+# macOS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+
+# Linux
+*~
+
+# ===== TEMPORARY FILES =====
+# Temporary files
+*.tmp
+*.temp
+.tmp/
+temp/
+tmp/
+
+# Archives
+*.7z
+*.dmg
+*.gz
+*.iso
+*.jar
+*.rar
+*.tar
+*.zip
+*.tgz
+
+# ===== SECURITY & KEYS =====
+# SSH keys
+*.pem
+*.key
+*.crt
+*.cer
+*.p12
+*.pfx
+
+# API keys and tokens (extra protection)
+*secret*
+*token*
+*api_key*
+*private_key*
+
+# ===== APPLICATION SPECIFIC =====
+# LangChain/LangGraph cache
+.langchain/
+.langgraph/
+
+# Model files (if any)
+*.model
+*.pkl
+*.pickle
+
+# Data files (user uploads, exports)
+uploads/
+exports/
+data/
+!backend/data/.gitkeep
+
+# Configuration backups
+config.bak
+settings.bak
+
+# ===== CI/CD & DEPLOYMENT =====
+# Docker
+.dockerignore
+docker-compose.override.yml
+
+# Deployment
+.vercel
+.netlify
+.aws
+.gcp
+
+# ===== MISC =====
+# Local development notes
+notes.txt
+todo.txt
+scratch.md
+debug.log
+
+# Package manager lock files (optional - team preference)
+# package-lock.json
+# yarn.lock
+# pnpm-lock.yaml

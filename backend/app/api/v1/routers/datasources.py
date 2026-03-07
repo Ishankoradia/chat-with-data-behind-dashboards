@@ -2,14 +2,16 @@
 Datasource management API endpoints
 """
 from typing import List
-from fastapi import APIRouter, HTTPException, Header
+from fastapi import APIRouter, HTTPException, Header, Depends
 from pydantic import BaseModel
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.datasource import (
     DatasourceConnection, 
     TableInfo
 )
 from app.services.datasource_service import DatasourceService
+from app.core.database import get_db
 
 router = APIRouter()
 
@@ -40,7 +42,8 @@ class SaveDatasourceRequest(BaseModel):
 @router.post("/test-connection")
 async def test_connection(
     request: TestConnectionRequest,
-    x_user_id: str = Header(default="anonymous")
+    x_user_id: str = Header(default="user_123"),
+    db: AsyncSession = Depends(get_db)
 ):
     """Test database connection before saving"""
     connection = DatasourceConnection(
@@ -53,7 +56,7 @@ async def test_connection(
         ssl_mode=request.ssl_mode,
     )
     
-    service = DatasourceService()
+    service = DatasourceService(db_session=db)
     result = await service.test_connection(connection)
     
     if not result["success"]:
@@ -65,7 +68,8 @@ async def test_connection(
 @router.post("/datasources")
 async def create_datasource(
     request: SaveDatasourceRequest,
-    x_user_id: str = Header(default="anonymous")
+    x_user_id: str = Header(default="user_123"),
+    db: AsyncSession = Depends(get_db)
 ):
     """Save a new datasource"""
     connection = DatasourceConnection(
@@ -78,7 +82,7 @@ async def create_datasource(
         ssl_mode=request.ssl_mode,
     )
     
-    service = DatasourceService()
+    service = DatasourceService(db_session=db)
     
     # Test connection first
     test_result = await service.test_connection(connection)
@@ -97,10 +101,11 @@ async def create_datasource(
 
 @router.get("/datasources")
 async def list_datasources(
-    x_user_id: str = Header(default="anonymous")
+    x_user_id: str = Header(default="user_123"),
+    db: AsyncSession = Depends(get_db)
 ) -> List[dict]:
     """List user's datasources"""
-    service = DatasourceService()
+    service = DatasourceService(db_session=db)
     datasources = await service.list_user_datasources(x_user_id)
     
     # Return safe info (no passwords)
@@ -121,10 +126,11 @@ async def list_datasources(
 @router.get("/datasources/{datasource_id}/tables")
 async def discover_tables(
     datasource_id: str,
-    x_user_id: str = Header(default="anonymous")
+    x_user_id: str = Header(default="user_123"),
+    db: AsyncSession = Depends(get_db)
 ) -> List[TableInfo]:
     """Discover tables in a datasource"""
-    service = DatasourceService()
+    service = DatasourceService(db_session=db)
     
     try:
         tables = await service.discover_tables(datasource_id, x_user_id)

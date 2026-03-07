@@ -427,6 +427,10 @@ class PostgresDatabaseService:
     # Dataset operations
     async def save_datasets_for_context(self, context_id: str, datasets: List[Dataset]):
         """Save datasets for dashboard context"""
+        print(f"DEBUG: Saving {len(datasets)} datasets for context {context_id}")
+        for i, dataset in enumerate(datasets):
+            print(f"DEBUG: Dataset {i}: {dataset.table_schema}.{dataset.table_name}")
+        
         async with self.session.begin():
             # Delete existing datasets for context
             await self.session.execute(text('''
@@ -449,6 +453,7 @@ class PostgresDatabaseService:
     
     async def get_datasets_for_context(self, context_id: str) -> List[Dataset]:
         """Get datasets for dashboard context"""
+        print(f"DEBUG: Getting datasets for context {context_id}")
         rows = await self.fetch_all('''
             SELECT dashboard_context_id, table_name, table_schema, alias, is_enabled
             FROM chat_datasets 
@@ -460,13 +465,13 @@ class PostgresDatabaseService:
         for row in rows:
             datasets.append(Dataset(
                 dashboard_context_id=context_id,
-                datasource_id=None,  # We'll get this from context
                 table_name=row[1],
                 table_schema=row[2],
                 alias=row[3],
                 is_enabled=row[4]
             ))
         
+        print(f"DEBUG: Found {len(datasets)} datasets for context {context_id}")
         return datasets
 
 

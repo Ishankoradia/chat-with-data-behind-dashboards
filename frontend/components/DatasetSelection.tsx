@@ -122,15 +122,22 @@ export default function DatasetSelection({
         datasets: datasetsToSave
       };
 
+      console.log('Creating dashboard context with request:', dashboardContextRequest);
+      console.log('Number of datasets to save:', datasetsToSave.length);
 
       const response = await fetch(`/api/v1/dashboard-contexts/`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'x-user-id': 'user_123'
+        },
         body: JSON.stringify(dashboardContextRequest)
       });
 
       if (response.ok) {
         const savedContext = await response.json();
+        console.log('Saved context response:', savedContext);
+        console.log('Datasets in response:', savedContext.datasets?.length || 0);
         
         // Create local dashboard context with backend ID
         const dashboardContext: DashboardContext = {

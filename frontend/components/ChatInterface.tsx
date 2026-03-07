@@ -9,9 +9,10 @@ import { formatTimestamp, formatExecutionTime, cn } from '@/lib/utils';
 interface ChatInterfaceProps {
   dashboardContextId: string;
   disabled?: boolean;
+  existingChatSessionId?: string;
 }
 
-export default function ChatInterface({ dashboardContextId, disabled = false }: ChatInterfaceProps) {
+export default function ChatInterface({ dashboardContextId, disabled = false, existingChatSessionId }: ChatInterfaceProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -19,6 +20,7 @@ export default function ChatInterface({ dashboardContextId, disabled = false }: 
   const [chatSessionId, setChatSessionId] = useState<string | null>(null);
   const [isInitializing, setIsInitializing] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -28,42 +30,83 @@ export default function ChatInterface({ dashboardContextId, disabled = false }: 
     scrollToBottom();
   }, [messages]);
 
-  // Create chat session when component loads
+  // Initialize chat session (existing or create new)
   useEffect(() => {
-    const createChatSession = async () => {
+    const initializeChatSession = async () => {
       if (!dashboardContextId) return;
       
       setIsInitializing(true);
       setError(null);
+      setMessages([]);
       
       try {
-        const response = await fetch('/api/v1/chat-sessions/', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            dashboard_context_id: dashboardContextId,
-            name: `Chat Session - ${new Date().toLocaleString()}`
-          }),
-        });
+        if (existingChatSessionId) {
+          // Use existing chat session and load its messages
+          setChatSessionId(existingChatSessionId);
+          await loadChatHistory(existingChatSessionId);
+        } else {
+          // Create new chat session
+          const response = await fetch('/api/v1/chat-sessions/', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-user-id': 'user_123'
+            },
+            body: JSON.stringify({
+              dashboard_context_id: dashboardContextId,
+              name: `Chat Session - ${new Date().toLocaleString()}`
+            }),
+          });
 
-        if (!response.ok) {
-          throw new Error(`Failed to create chat session: ${response.statusText}`);
+          if (!response.ok) {
+            throw new Error(`Failed to create chat session: ${response.statusText}`);
+          }
+
+          const sessionData = await response.json();
+          setChatSessionId(sessionData.id);
         }
-
-        const sessionData = await response.json();
-        setChatSessionId(sessionData.id);
       } catch (error) {
-        console.error('Error creating chat session:', error);
+        console.error('Error initializing chat session:', error);
         setError('Failed to initialize chat session');
       } finally {
         setIsInitializing(false);
       }
     };
 
-    createChatSession();
-  }, [dashboardContextId]);
+    initializeChatSession();
+  }, [dashboardContextId, existingChatSessionId]);
+
+  // Load chat history for existing session
+  const loadChatHistory = async (sessionId: string) => {
+    try {
+      const response = await fetch(`/api/v1/chat-sessions/${sessionId}/messages`, {
+        headers: {
+          'x-user-id': 'user_123'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to load chat history');
+      }
+
+      const messagesData = await response.json();
+      
+      // Convert backend messages to frontend format
+      const formattedMessages: ChatMessage[] = messagesData.map((msg: any) => ({
+        id: msg.id,
+        role: msg.role,
+        content: msg.content,
+        timestamp: new Date(msg.created_at),
+        queryResult: msg.query_result ? JSON.parse(msg.query_result) : undefined,
+        reasoning: msg.reasoning
+      }));
+
+      setMessages(formattedMessages);
+    } catch (error) {
+      console.error('Error loading chat history:', error);
+      setError('Failed to load chat history');
+    }
+  };
 
   const clearChat = () => {
     setMessages([]);
@@ -212,9 +255,17 @@ export default function ChatInterface({ dashboardContextId, disabled = false }: 
       <div className="border-b p-4 flex justify-between items-center">
         <div>
           <h2 className="text-lg font-semibold">Chat</h2>
-          {dashboardContextId && (
-            <p className="text-sm text-gray-500">Dashboard Context: {dashboardContextId}</p>
-          )}
+          <div className="text-sm text-gray-500 space-y-1">
+            {dashboardContextId && (
+              <p>Dashboard Context: {dashboardContextId}</p>
+            )}
+            {chatSessionId && (
+              <p>Session: {chatSessionId}</p>
+            )}
+            {existingChatSessionId && messages.length > 0 && (
+              <p className="text-green-600">Loaded {messages.length} previous messages</p>
+            )}
+          </div>
         </div>
         {messages.length > 0 && (
           <button
@@ -247,9 +298,15 @@ export default function ChatInterface({ dashboardContextId, disabled = false }: 
           </div>
         )}
 
-        {disabled && (
+        {disabled && !existingChatSessionId && (
           <div className="text-center text-gray-500 py-8">
             <p>Please select a dashboard to start chatting</p>
+          </div>
+        )}
+
+        {disabled && existingChatSessionId && (
+          <div className="text-center text-gray-500 py-8">
+            <p>Loading session context...</p>
           </div>
         )}
 
@@ -388,7 +445,13 @@ export default function ChatInterface({ dashboardContextId, disabled = false }: 
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             onKeyPress={handleKeyPress}
-            placeholder={disabled ? 'Select a dashboard first...' : 'Ask a question about your data...'}
+            placeholder={
+              disabled && !existingChatSessionId 
+                ? 'Select a dashboard first...' 
+                : disabled && existingChatSessionId 
+                  ? 'Loading session context...'
+                  : 'Ask a question about your data...'
+            }
             disabled={disabled || isLoading}
             className="flex-1 resize-none border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent disabled:bg-gray-50 disabled:text-gray-500"
             rows={1}

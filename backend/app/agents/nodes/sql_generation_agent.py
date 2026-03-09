@@ -251,6 +251,13 @@ def generate_sql_query(state: AgentState) -> Dict[str, Any]:
         # Step 3: Generate SQL with enhanced prompt
         sql_step.description = "✍️ Writing SQL query..."
         
+        # Debug: Print schema context to see if descriptions are included
+        print("=" * 50)
+        print("🔍 SCHEMA CONTEXT FOR SQL GENERATION:")
+        print("=" * 50)
+        print(schema_context)
+        print("=" * 50)
+        
         # Build comprehensive prompt for SQL generation
         sql_prompt = f"""
         You are an expert PostgreSQL analyst. Generate a precise SQL query to answer the user's question.
